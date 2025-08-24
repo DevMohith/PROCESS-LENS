@@ -1,4 +1,3 @@
-# services/llm.py
 import os, requests
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"

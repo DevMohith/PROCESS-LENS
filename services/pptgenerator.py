@@ -5,9 +5,7 @@ from pptx.util import Inches, Pt
 from pptx.enum.text import PP_ALIGN
 from pptx.enum.shapes import PP_PLACEHOLDER
 
-# Helper: get a usable text_frame for the slide body
 def _get_body_text_frame(slide):
-    # Prefer BODY; some templates expose OBJECT instead of BODY
     for ph in slide.placeholders:
         try:
             ph_type = ph.placeholder_format.type
@@ -16,7 +14,6 @@ def _get_body_text_frame(slide):
         if ph_type in (PP_PLACEHOLDER.BODY, PP_PLACEHOLDER.OBJECT):
             return ph.text_frame
 
-    # Fallback: create our own textbox
     box = slide.shapes.add_textbox(Inches(0.8), Inches(1.8), Inches(9.0), Inches(5.0))
     return box.text_frame
 
@@ -32,14 +29,11 @@ def generate_ppt(
     os.makedirs(output_dir, exist_ok=True)
     path = os.path.join(output_dir, filename)
 
-    # Load template if provided; else use default theme
     prs = Presentation(template_path) if template_path else Presentation()
 
-    # -------- Title slide (layout 0 usually works, but be defensive)
     title_layout_idx = 0 if len(prs.slide_layouts) > 0 else 0
     slide = prs.slides.add_slide(prs.slide_layouts[title_layout_idx])
 
-    # Title (safe)
     if slide.shapes.title is not None:
         slide.shapes.title.text = title
     else:
@@ -48,7 +42,6 @@ def generate_ppt(
         p.text = title
         p.font.size = Pt(32)
 
-    # Subtitle/summary — try a SUBTITLE/BODY placeholder, else add textbox
     body_tf = None
     for ph in slide.placeholders:
         try:
@@ -64,8 +57,7 @@ def generate_ppt(
     body_tf.clear()
     body_tf.paragraphs[0].text = summary or "Summary"
 
-    # -------- KPI slide
-    content_layout_idx = 1 if len(prs.slide_layouts) > 1 else 0  # "Title and Content" if available
+    content_layout_idx = 1 if len(prs.slide_layouts) > 1 else 0
     slide = prs.slides.add_slide(prs.slide_layouts[content_layout_idx])
 
     if slide.shapes.title is not None:
@@ -78,7 +70,6 @@ def generate_ppt(
 
     tf = _get_body_text_frame(slide)
     tf.clear()
-    # Write KPIs
     if kpis:
         first = True
         for k, v in kpis.items():
@@ -92,7 +83,6 @@ def generate_ppt(
     else:
         tf.paragraphs[0].text = "No KPIs available."
 
-    # -------- Bottlenecks slide
     slide = prs.slides.add_slide(prs.slide_layouts[content_layout_idx])
     if slide.shapes.title is not None:
         slide.shapes.title.text = "Bottlenecks & Actions"
@@ -117,7 +107,6 @@ def generate_ppt(
     else:
         tf.paragraphs[0].text = "No bottlenecks found."
 
-    # -------- Next Steps slide (use a content layout if available; index 5 may not exist in custom templates)
     next_steps_layout_idx = content_layout_idx if len(prs.slide_layouts) <= 5 else 5
     slide = prs.slides.add_slide(prs.slide_layouts[next_steps_layout_idx])
     if slide.shapes.title is not None:

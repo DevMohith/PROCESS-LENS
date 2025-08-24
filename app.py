@@ -1,6 +1,5 @@
-# app.py
 from dotenv import load_dotenv
-load_dotenv()  # ✱ must be first
+load_dotenv()
 
 import os
 from flask import Flask, request, jsonify, send_file
@@ -16,7 +15,7 @@ CORS(app, resources={r"/*": {"origins": ["http://localhost:5173", "http://127.0.
 def health():
     return jsonify({"ok": True})
 
-# ✱ Move heavy imports INSIDE routes so a missing package/key won’t break /health
+
 def _analyze_only(query: str):
     from services.signavio import fetch_process_data, send_to_llm_context
     from services.llm import chat_complete
@@ -72,7 +71,8 @@ def tts():
 
 @app.post("/run-agent")
 def run_agent_route():
-    from agent import run_agent                 # ✱ lazy import
+    # lazy import
+    from agent import run_agent
     payload = request.get_json(force=True) or {}
     query = payload.get("query", "Weekly bottlenecks")
     make_ppt_flag = bool(payload.get("make_ppt", True))

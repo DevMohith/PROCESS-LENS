@@ -4,6 +4,7 @@ load_dotenv()
 import os
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
+from services.smtp import send_email_with_attachment
 
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./outputs")
 
@@ -40,7 +41,7 @@ def analyze():
 
 @app.post("/ppt")
 def ppt():
-    from services.pptgenerator import generate_ppt   # ✱ lazy import
+    from services.pptgenerator import generate_ppt
     payload = request.get_json(force=True) or {}
     title = payload.get("title", "Process Intelligence – Bottlenecks")
     summary = payload.get("summary", "Weekly insights")
@@ -59,7 +60,7 @@ def download():
 
 @app.post("/tts")
 def tts():
-    from services.tts import synthesize_tts     # ✱ lazy import
+    from services.tts import synthesize_tts 
     payload = request.get_json(force=True) or {}
     text = payload.get("text", "No narration provided.")
     filename = payload.get("filename", "narration.mp3")
@@ -77,8 +78,19 @@ def run_agent_route():
     query = payload.get("query", "Weekly bottlenecks")
     make_ppt_flag = bool(payload.get("make_ppt", True))
     narrate_flag = bool(payload.get("narrate", True))
+    emails = payload.get("emails", [])
     try:
         result = run_agent(query, make_ppt_flag, narrate_flag)
+        ppt_path = result.get("ppt_path")
+        if ppt_path and emails:
+            email_res = send_email_with_attachment(
+                emails,
+                subject="ProcessLens – Auto-generated PPT",
+                body=f"Here is the PPT for: {query}",
+                attachment_path=ppt_path
+            )
+            result["email"] = email_res
+            
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 400

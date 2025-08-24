@@ -1,28 +1,36 @@
 # app.py
+from dotenv import load_dotenv
+load_dotenv()  # ✱ must be first
+
 import os
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-from dotenv import load_dotenv
-from agent import run_agent
-from services.signavio import fetch_process_data, send_to_llm_context
-from services.llm import chat_complete
-from services.pptgenerator import generate_ppt
-from services.tts import synthesize_tts
 
-load_dotenv()
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./outputs")
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": 
-    {"origins": 
-        ["http://localhost:5173", 
-        "http://127.0.0.1:5173", 
-        "*"
-        ]}})
+app.config["PROPAGATE_EXCEPTIONS"] = True
+CORS(app, resources={r"/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173", "*"]}})
 
 @app.get("/health")
 def health():
-    return {"ok": True}
+    return jsonify({"ok": True})
+
+# ✱ Move heavy imports INSIDE routes so a missing package/key won’t break /health
+def _analyze_only(query: str):
+    from services.signavio import fetch_process_data, send_to_llm_context
+    from services.llm import chat_complete
+    raw = fetch_process_data(query)
+    context = send_to_llm_context(raw)
+    messages = [
+        {"role": "system", "content": "You are a Process Intelligence Analyst. "
+         "Return JSON with keys: summary (string), bullets (list), actions (list), narration (string)."},
+        {"role": "user", "content": f"Analyze:\n{context}"},
+    ]
+    import json
+    content = chat_complete(messages)
+    parsed = json.loads(content)
+    return raw, parsed
 
 @app.post("/analyze")
 def analyze():
@@ -31,29 +39,15 @@ def analyze():
     raw, analysis = _analyze_only(query)
     return jsonify({"raw": raw, "analysis": analysis})
 
-def _analyze_only(query):
-    from services.signavio import fetch_process_data, to_llm_context
-    raw = fetch_process_data(query)
-    context = to_llm_context(raw)
-    messages = [
-        {"role": "system", "content": """You are a Process Intelligence Analyst.
-Return JSON with keys: summary (string), bullets (list), actions (list), narration (string)."""},
-        {"role": "user", "content": f"Analyze:\n{context}"},
-    ]
-    import json
-    content = chat_complete(messages)
-    parsed = json.loads(content)
-    return raw, parsed
-
 @app.post("/ppt")
 def ppt():
+    from services.pptgenerator import generate_ppt   # ✱ lazy import
     payload = request.get_json(force=True) or {}
     title = payload.get("title", "Process Intelligence – Bottlenecks")
     summary = payload.get("summary", "Weekly insights")
     bullets = payload.get("bullets", [])
     kpis = payload.get("kpis", {})
     filename = payload.get("filename", "bottlenecks.pptx")
-
     path = generate_ppt(title, summary, bullets, kpis, filename, output_dir=OUTPUT_DIR)
     return jsonify({"ppt_path": path})
 
@@ -66,6 +60,7 @@ def download():
 
 @app.post("/tts")
 def tts():
+    from services.tts import synthesize_tts     # ✱ lazy import
     payload = request.get_json(force=True) or {}
     text = payload.get("text", "No narration provided.")
     filename = payload.get("filename", "narration.mp3")
@@ -77,11 +72,11 @@ def tts():
 
 @app.post("/run-agent")
 def run_agent_route():
+    from agent import run_agent                 # ✱ lazy import
     payload = request.get_json(force=True) or {}
     query = payload.get("query", "Weekly bottlenecks")
     make_ppt_flag = bool(payload.get("make_ppt", True))
     narrate_flag = bool(payload.get("narrate", True))
-
     try:
         result = run_agent(query, make_ppt_flag, narrate_flag)
         return jsonify(result)

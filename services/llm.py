@@ -1,29 +1,27 @@
-# services/openrouter.py
-import os
-import requests
-from dotenv import load_dotenv
+# services/llm.py
+import os, requests
 
-load_dotenv()
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+APP_URL   = os.getenv("APP_URL", "http://localhost:8000")
+APP_TITLE = os.getenv("APP_TITLE", "ProcessLens")
+DEFAULT_MODEL = os.getenv("OPENROUTER_MODEL", "mistralai/mistral-7b-instruct")
 
-DEFAULT_MODEL = "mistralai/mistral-7b-instruct"
-
-def chat_complete(messages, model: str = DEFAULT_MODEL, temperature: float = 0.2, max_tokens: int = 1200):
-    if not OPENROUTER_API_KEY:
+def chat_complete(messages, model: str = None) -> str:
+    api_key = os.getenv("OPENROUTER_API_KEY")   
+    if not api_key:
         raise RuntimeError("Missing OPENROUTER_API_KEY")
 
+    use_model = model or DEFAULT_MODEL
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
+        "HTTP-Referer": APP_URL,
+        "X-Title": APP_TITLE,
     }
-    payload = {
-        "model": model,
-        "messages": messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-    }
-    r = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=60)
-    r.raise_for_status()
-    data = r.json()
-    return data["choices"][0]["message"]["content"]
+    payload = {"model": use_model, "messages": messages, "temperature": 0.2}
+    resp = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=60)
+    if resp.status_code != 200:
+        try: detail = resp.json()
+        except: detail = resp.text
+        raise RuntimeError(f"OpenRouter error {resp.status_code}: {detail}")
+    return resp.json()["choices"][0]["message"]["content"]

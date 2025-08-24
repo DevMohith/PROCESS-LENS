@@ -9,3 +9,7 @@
 # Fill OPENROUTER_API_KEY, ELEVENLABS_API_KEY
 mkdir -p outputs
 python app.py
+
+
+
+to run backed app:  uvicorn app:app --reload --port 8000

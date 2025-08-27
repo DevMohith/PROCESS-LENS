@@ -1,4 +1,4 @@
-# ProcessLens – Bottleneck Agent (LLM + PPT + TTS)
+# ProcessLens – Bottleneck Agent (LLM + PPT + TTS)[
 
 ## What this does
 - Pulls (mocked) Signavio Process Intelligence data
